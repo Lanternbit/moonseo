@@ -1,7 +1,23 @@
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  console.log("Message received in content script:", request);
-  if (request.message === "confirm_download") {
-    const userConfirmed = confirm("안전한 파일이 아닙니다. 그래도 받으시겠습니까?");
-    sendResponse({ userConfirmed: userConfirmed });
-  }
-});
+let confirmationPromise = null;
+let isListenerRegistered = false;
+
+if (!isListenerRegistered) {
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.message === "confirm_download") {
+      if (confirmationPromise) {
+        confirmationPromise.then(sendResponse);
+        return true; // 비동기 응답을 위해 true 반환
+      }
+  
+      confirmationPromise = new Promise((resolve) => {
+        const userConfirmed = confirm("이 파일을 다운로드하시겠습니까?");
+        resolve({ userConfirmed });
+      });
+  
+      confirmationPromise.then(sendResponse);
+      return true; // 비동기 응답을 위해 true 반환
+    }
+  });
+
+  isListenerRegistered = true;
+}

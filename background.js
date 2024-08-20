@@ -1,7 +1,11 @@
 chrome.downloads.onCreated.addListener((downloadItem) => {
-  chrome.downloads.pause(downloadItem.id);
-  console.log(downloadItem.mime);
-  checkDownloadSafety(downloadItem);
+  chrome.downloads.pause(downloadItem.id, () => {
+    if (chrome.runtime.lastError) {
+      console.error("Failed to pause download:", chrome.runtime.lastError.message);
+    } else {
+      checkDownloadSafety(downloadItem);
+    }
+  });
 });
 
 async function checkDownloadSafety(downloadItem) {
@@ -36,7 +40,7 @@ async function checkDownloadSafety(downloadItem) {
                 chrome.downloads.cancel(downloadItem.id);
                 chrome.notifications.create({
                   type: 'basic',
-                  iconUrl: 'icon.png',
+                  iconUrl: 'images/icon-48.png',
                   title: '다운로드 취소됨',
                   message: '다운로드가 취소되었습니다.'
                 });
