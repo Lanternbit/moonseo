@@ -1,12 +1,24 @@
+let downloadQueue = [];
+let isProcessing = false;
+
 chrome.downloads.onCreated.addListener((downloadItem) => {
-  chrome.downloads.pause(downloadItem.id, () => {
-    if (chrome.runtime.lastError) {
-      console.error("Failed to pause download:", chrome.runtime.lastError.message);
-    } else {
-      checkDownloadSafety(downloadItem);
-    }
-  });
+  chrome.downloads.pause(downloadItem.id);
+  downloadQueue.push(downloadItem);  // 큐에 다운로드 항목 추가
+  processQueue();  // 큐 처리 시작
 });
+
+async function processQueue() {
+  if (isProcessing) return;  // 이미 처리 중이면 대기
+  isProcessing = true;
+
+  while (downloadQueue.length > 0) {
+    const downloadItem = downloadQueue.shift();  // 큐에서 항목을 하나 꺼냄
+    console.log(downloadItem.id);
+    await checkDownloadSafety(downloadItem);  // 다운로드 처리
+  }
+
+  isProcessing = false;
+}
 
 async function checkDownloadSafety(downloadItem) {
   try {
@@ -24,33 +36,37 @@ async function checkDownloadSafety(downloadItem) {
     if (result.safe) {
       chrome.downloads.resume(downloadItem.id);
     } else {
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs.length > 0) {
-          // 현재 탭에 content.js를 주입
+      const tabs = await new Promise((resolve) => {
+        chrome.tabs.query({ active: true, currentWindow: true }, resolve);
+      });
+
+      if (tabs.length > 0) {
+        await new Promise((resolve) => {
           chrome.scripting.executeScript({
             target: { tabId: tabs[0].id },
             files: ['content.js']
-          }, () => {
-            // content.js가 주입된 후에 메시지 보내기
-            chrome.tabs.sendMessage(tabs[0].id, { message: "confirm_download" }, (response) => {
-              console.log(response);
-              if (response.userConfirmed) {
-                chrome.downloads.resume(downloadItem.id);
-              } else {
-                chrome.downloads.cancel(downloadItem.id);
-                chrome.notifications.create({
-                  type: 'basic',
-                  iconUrl: 'images/icon-48.png',
-                  title: '다운로드 취소됨',
-                  message: '다운로드가 취소되었습니다.'
-                });
-              }
-            });
-          });
+          }, resolve);
+        });
+
+        const userResponse = await new Promise((resolve) => {
+          chrome.tabs.sendMessage(tabs[0].id, { message: "confirm_download" }, resolve);
+        });
+
+        if (userResponse.userConfirmed) {
+          chrome.downloads.resume(downloadItem.id);
         } else {
-          console.log("No active tab found.");
+          chrome.downloads.cancel(downloadItem.id);
+          chrome.notifications.create({
+            type: 'basic',
+            iconUrl: 'images/icon-48.png',
+            title: '다운로드 취소됨',
+            message: '다운로드가 취소되었습니다.'
+          });
         }
-      });
+      } else {
+        console.log("No active tab found.");
+        chrome.downloads.cancel(downloadItem.id);
+      }
     }
   } catch (error) {
     console.error('Error checking download safety:', error);
