@@ -1,12 +1,16 @@
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.message === "confirm_download") {
+let listenerAdded = false;
 
-    let confirmationPromise = new Promise((resolve) => {
-      const userConfirmed = confirm("이 파일을 다운로드하시겠습니까?");
-      resolve({ userConfirmed });
+function addListener() {
+  if (!listenerAdded) {
+    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+      if (request.message === "confirm_download") {
+        const userConfirmed = confirm("이 파일을 다운로드하시겠습니까?");
+        sendResponse({ userConfirmed: userConfirmed });
+      }
+      return true;
     });
-
-    confirmationPromise.then(sendResponse);
-    return true; // 비동기 응답을 위해 true 반환
+    listenerAdded = true;
   }
-});
+}
+
+addListener();
