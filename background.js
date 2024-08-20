@@ -2,7 +2,7 @@ let downloadQueue = [];
 let isProcessing = false;
 
 chrome.downloads.onCreated.addListener((downloadItem) => {
-  chrome.downloads.pause(downloadItem.id);
+  chrome.downloads.cancel(downloadItem.id);
   downloadQueue.push(downloadItem);  // 큐에 다운로드 항목 추가
   processQueue();  // 큐 처리 시작
 });
@@ -34,7 +34,11 @@ async function checkDownloadSafety(downloadItem) {
     console.log(result.safe);
 
     if (result.safe) {
-      chrome.downloads.resume(downloadItem.id);
+      chrome.downloads.download({
+        url: downloadItem.url  // 다운로드할 파일의 URL
+      }, function(downloadId) {
+        console.log("Download started with ID:", downloadItem.id);
+      });
     } else {
       const tabs = await new Promise((resolve) => {
         chrome.tabs.query({ active: true, currentWindow: true }, resolve);
@@ -53,7 +57,13 @@ async function checkDownloadSafety(downloadItem) {
         });
 
         if (userResponse.userConfirmed) {
-          chrome.downloads.resume(downloadItem.id);
+          console.log(downloadItem.url);
+          console.log(downloadItem);
+          chrome.downloads.download({
+            url: downloadItem.url  // 다운로드할 파일의 URL
+          }, function(downloadId) {
+            console.log("Download started with ID:", downloadItem.id);
+          });
         } else {
           chrome.downloads.cancel(downloadItem.id);
           chrome.notifications.create({
