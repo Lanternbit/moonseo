@@ -13,7 +13,9 @@
     "downloads.open",
     "notifications",
     "activeTab",
-    "scripting"
+    "scripting",
+    "cookies",
+    "webRequest"
   ],
   "host_permissions": [
     "https://15.164.40.221:5000/*",
