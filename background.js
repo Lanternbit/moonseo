@@ -18,24 +18,34 @@ async function checkDownloadSafety(downloadItem) {
     console.log(result.safe);
 
     if (result.safe) {
-      console.log("safe");
       chrome.downloads.resume(downloadItem.id);
     } else {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        chrome.tabs.sendMessage(tabs[0].id, { message: "confirm_download" }, (response) => {
-          console.log(response);
-          if (response.userConfirmed) {
-            chrome.downloads.resume(downloadItem.id);
-          } else {
-            chrome.downloads.cancel(downloadItem.id);
-            chrome.notifications.create({
-              type: 'basic',
-              iconUrl: 'icon.png',
-              title: '다운로드 취소됨',
-              message: '다운로드가 취소되었습니다.'
+        if (tabs.length > 0) {
+          // 현재 탭에 content.js를 주입
+          chrome.scripting.executeScript({
+            target: { tabId: tabs[0].id },
+            files: ['content.js']
+          }, () => {
+            // content.js가 주입된 후에 메시지 보내기
+            chrome.tabs.sendMessage(tabs[0].id, { message: "confirm_download" }, (response) => {
+              console.log(response);
+              if (response.userConfirmed) {
+                chrome.downloads.resume(downloadItem.id);
+              } else {
+                chrome.downloads.cancel(downloadItem.id);
+                chrome.notifications.create({
+                  type: 'basic',
+                  iconUrl: 'icon.png',
+                  title: '다운로드 취소됨',
+                  message: '다운로드가 취소되었습니다.'
+                });
+              }
             });
-          }
-        });
+          });
+        } else {
+          console.log("No active tab found.");
+        }
       });
     }
   } catch (error) {
